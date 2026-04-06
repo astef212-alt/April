@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Golf Shot Tracker{% endblock %}
+
+{% block content %}
+
+<!-- Stats bar -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+  {% set stat_items = [
+    ("Rounds", stats.rounds_played, ""),
+    ("Avg Score", stats.avg_score, ""),
+    ("Best Score", stats.best_score, ""),
+    ("Avg Putts", stats.avg_putts, ""),
+    ("Fairways %", stats.avg_fairway_pct, "%"),
+    ("GIR %", stats.avg_gir_pct, "%"),
+  ] %}
+  {% for label, value, suffix in stat_items %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <div class="text-2xl font-bold text-green-700">
+      {% if value is not none %}{{ value }}{{ suffix }}{% else %}—{% endif %}
+    </div>
+    <div class="text-xs text-gray-500 mt-1">{{ label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if rounds %}
+
+<!-- Charts -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <h2 class="text-sm font-semibold text-gray-600 mb-3">Score Trend</h2>
+    <canvas id="scoreChart" height="180"></canvas>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <h2 class="text-sm font-semibold text-gray-600 mb-3">Putting Trend</h2>
+    <canvas id="puttChart" height="180"></canvas>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <h2 class="text-sm font-semibold text-gray-600 mb-3">Fairways Hit %</h2>
+    <canvas id="fairwayChart" height="180"></canvas>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <h2 class="text-sm font-semibold text-gray-600 mb-3">Greens in Regulation %</h2>
+    <canvas id="girChart" height="180"></canvas>
+  </div>
+</div>
+
+<!-- Rounds table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 class="font-semibold text-gray-800">All Rounds</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="px-5 py-3 text-left">Date</th>
+          <th class="px-5 py-3 text-left">Course</th>
+          <th class="px-5 py-3 text-center">Holes</th>
+          <th class="px-5 py-3 text-center">Score</th>
+          <th class="px-5 py-3 text-center">Putts</th>
+          <th class="px-5 py-3 text-center">FW%</th>
+          <th class="px-5 py-3 text-center">GIR%</th>
+          <th class="px-5 py-3 text-center">Detail</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for r in rounds %}
+        <tr class="hover:bg-gray-50 transition">
+          <td class="px-5 py-3 text-gray-700 whitespace-nowrap">{{ r.date.strftime('%b %d, %Y') }}</td>
+          <td class="px-5 py-3 text-gray-700">{{ r.course_name or '—' }}</td>
+          <td class="px-5 py-3 text-center text-gray-600">{{ r.holes_played or '—' }}</td>
+          <td class="px-5 py-3 text-center font-semibold text-gray-800">{{ r.total_score or '—' }}</td>
+          <td class="px-5 py-3 text-center text-gray-600">{{ r.total_putts or '—' }}</td>
+          <td class="px-5 py-3 text-center text-gray-600">{% if r.fairway_pct is not none %}{{ r.fairway_pct }}%{% else %}—{% endif %}</td>
+          <td class="px-5 py-3 text-center text-gray-600">{% if r.gir_pct is not none %}{{ r.gir_pct }}%{% else %}—{% endif %}</td>
+          <td class="px-5 py-3 text-center">
+            <a href="{{ url_for('round_detail', round_id=r.id) }}"
+               class="text-green-600 hover:text-green-800 font-medium">View →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="text-center py-24 text-gray-400">
+  <div class="text-6xl mb-4">⛳</div>
+  <p class="text-lg font-medium mb-2">No rounds yet</p>
+  <p class="text-sm mb-6">Click <strong>Sync Rounds</strong> in the top bar to pull your golf data from Garmin Connect.</p>
+</div>
+{% endif %}
+
+<script>
+const chartData = {{ chart_data | tojson }};
+
+function makeChart(id, label, data, color) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        label,
+        data,
+        borderColor: color,
+        backgroundColor: color + '22',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+makeChart('scoreChart',   'Score',      chartData.scores,       '#15803d');
+makeChart('puttChart',    'Putts',      chartData.putts,        '#0369a1');
+makeChart('fairwayChart', 'Fairways %', chartData.fairway_pcts, '#d97706');
+makeChart('girChart',     'GIR %',      chartData.gir_pcts,     '#7c3aed');
+</script>
+
+{% endblock %}

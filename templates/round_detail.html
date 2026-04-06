@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}{{ round.course_name }} – Golf Shot Tracker{% endblock %}
+
+{% block content %}
+
+<!-- Back link -->
+<a href="{{ url_for('index') }}" class="text-sm text-green-600 hover:text-green-800 mb-4 inline-block">← Back to Dashboard</a>
+
+<!-- Round header -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-bold text-gray-800">{{ round.course_name or 'Unknown Course' }}</h1>
+      <p class="text-sm text-gray-500 mt-0.5">{{ round.date.strftime('%A, %B %d, %Y') }}</p>
+    </div>
+    <div class="flex gap-6 text-center">
+      <div>
+        <div class="text-3xl font-bold text-green-700">{{ round.total_score or '—' }}</div>
+        <div class="text-xs text-gray-400">Score</div>
+      </div>
+      <div>
+        <div class="text-3xl font-bold text-blue-600">{{ round.total_putts or '—' }}</div>
+        <div class="text-xs text-gray-400">Putts</div>
+      </div>
+      {% if round.fairway_pct is not none %}
+      <div>
+        <div class="text-3xl font-bold text-amber-600">{{ round.fairway_pct }}%</div>
+        <div class="text-xs text-gray-400">Fairways</div>
+      </div>
+      {% endif %}
+      {% if round.gir_pct is not none %}
+      <div>
+        <div class="text-3xl font-bold text-purple-600">{{ round.gir_pct }}%</div>
+        <div class="text-xs text-gray-400">GIR</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Scorecard legend -->
+<div class="flex flex-wrap gap-2 mb-4 text-xs">
+  {% for cls, label in [('score-eagle','Eagle or better'), ('score-birdie','Birdie'), ('score-par','Par'), ('score-bogey','Bogey'), ('score-double','Double'), ('score-worse','Triple+')] %}
+  <span class="px-2 py-0.5 rounded {{ cls }}">{{ label }}</span>
+  {% endfor %}
+</div>
+
+{% if round.holes %}
+<!-- Scorecard table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 class="font-semibold text-gray-800">Hole-by-Hole Scorecard</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-center">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="px-4 py-3 text-left">Hole</th>
+          <th class="px-4 py-3">Par</th>
+          <th class="px-4 py-3">Score</th>
+          <th class="px-4 py-3">+/-</th>
+          <th class="px-4 py-3">Putts</th>
+          <th class="px-4 py-3">FW</th>
+          <th class="px-4 py-3">GIR</th>
+          <th class="px-4 py-3">Drive (yds)</th>
+          <th class="px-4 py-3">Shots</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for h in round.holes %}
+        {% set stp = h.score_to_par %}
+        {% if stp is not none %}
+          {% if stp <= -2 %}{% set score_cls = 'score-eagle' %}
+          {% elif stp == -1 %}{% set score_cls = 'score-birdie' %}
+          {% elif stp == 0 %}{% set score_cls = 'score-par' %}
+          {% elif stp == 1 %}{% set score_cls = 'score-bogey' %}
+          {% elif stp == 2 %}{% set score_cls = 'score-double' %}
+          {% else %}{% set score_cls = 'score-worse' %}
+          {% endif %}
+        {% else %}
+          {% set score_cls = '' %}
+        {% endif %}
+        <tr class="hover:bg-gray-50 transition" id="hole-{{ h.hole_number }}">
+          <td class="px-4 py-3 text-left font-medium text-gray-800">{{ h.hole_number }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ h.par or '—' }}</td>
+          <td class="px-4 py-3">
+            {% if h.score is not none %}
+            <span class="inline-block w-8 h-8 leading-8 rounded-full font-bold {{ score_cls }}">{{ h.score }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3 font-medium
+            {% if stp is not none and stp < 0 %}text-green-600
+            {% elif stp == 0 %}text-blue-600
+            {% elif stp is not none and stp > 0 %}text-red-500
+            {% endif %}">
+            {% if stp is not none %}{{ '%+d' % stp }}{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ h.putts if h.putts is not none else '—' }}</td>
+          <td class="px-4 py-3">
+            {% if h.fairway_hit is not none %}
+              {% if h.fairway_hit %}<span class="text-green-600">✓</span>{% else %}<span class="text-red-400">✗</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            {% if h.gir is not none %}
+              {% if h.gir %}<span class="text-green-600">✓</span>{% else %}<span class="text-red-400">✗</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ h.drive_distance or '—' }}</td>
+          <td class="px-4 py-3">
+            {% if h.shots %}
+            <button onclick="toggleShots({{ h.id }})"
+                    class="text-xs text-green-600 hover:text-green-800 underline">
+              {{ h.shots | length }} shots
+            </button>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% if h.shots %}
+        <tr id="shots-{{ h.id }}" class="hidden bg-green-50">
+          <td colspan="9" class="px-6 py-3">
+            <div class="text-xs text-gray-500 font-semibold mb-2">SHOTS – HOLE {{ h.hole_number }}</div>
+            <div class="overflow-x-auto">
+              <table class="text-xs w-full">
+                <thead>
+                  <tr class="text-gray-400 uppercase tracking-wide">
+                    <th class="pr-6 py-1 text-left">#</th>
+                    <th class="pr-6 py-1 text-left">Club</th>
+                    <th class="pr-6 py-1 text-right">Distance (yds)</th>
+                    <th class="pr-6 py-1 text-right">Start (lat/lon)</th>
+                    <th class="py-1 text-right">End (lat/lon)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for s in h.shots %}
+                  <tr class="border-t border-green-100">
+                    <td class="pr-6 py-1.5 font-medium">{{ s.shot_number }}</td>
+                    <td class="pr-6 py-1.5">{{ s.club or '—' }}</td>
+                    <td class="pr-6 py-1.5 text-right">{{ s.distance_yards or '—' }}</td>
+                    <td class="pr-6 py-1.5 text-right text-gray-400">
+                      {% if s.start_lat and s.start_lon %}{{ '%.5f' % s.start_lat }}, {{ '%.5f' % s.start_lon }}{% else %}—{% endif %}
+                    </td>
+                    <td class="py-1.5 text-right text-gray-400">
+                      {% if s.end_lat and s.end_lon %}{{ '%.5f' % s.end_lat }}, {{ '%.5f' % s.end_lon }}{% else %}—{% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Score distribution mini-chart -->
+{% set hole_scores = round.holes | selectattr('score_to_par', 'ne', none) | list %}
+{% if hole_scores %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+  <h2 class="text-sm font-semibold text-gray-600 mb-3">Score Distribution This Round</h2>
+  <canvas id="distChart" height="100"></canvas>
+</div>
+<script>
+(function() {
+  const holes = {{ round.holes | map(attribute='score_to_par') | list | tojson }};
+  const buckets = {'Eagle or better': 0, 'Birdie': 0, 'Par': 0, 'Bogey': 0, 'Double': 0, 'Triple+': 0};
+  holes.forEach(s => {
+    if (s === null) return;
+    if (s <= -2) buckets['Eagle or better']++;
+    else if (s === -1) buckets['Birdie']++;
+    else if (s === 0) buckets['Par']++;
+    else if (s === 1) buckets['Bogey']++;
+    else if (s === 2) buckets['Double']++;
+    else buckets['Triple+']++;
+  });
+  new Chart(document.getElementById('distChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(buckets),
+      datasets: [{ data: Object.values(buckets),
+        backgroundColor: ['#fde68a','#bbf7d0','#e0f2fe','#fed7aa','#fecaca','#f3e8ff'] }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { ticks: { stepSize: 1 }, beginAtZero: true }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+
+{% else %}
+<div class="text-center py-16 text-gray-400">
+  <p>No hole data available for this round.</p>
+  <p class="text-sm mt-1">Hole-by-hole detail requires a compatible Garmin device (e.g., Approach series).</p>
+</div>
+{% endif %}
+
+<script>
+function toggleShots(holeId) {
+  const row = document.getElementById('shots-' + holeId);
+  if (row) row.classList.toggle('hidden');
+}
+</script>
+
+{% endblock %}

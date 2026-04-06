@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Golf Shot Tracker{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .score-eagle   { background: #fde68a; color: #78350f; }
+    .score-birdie  { background: #bbf7d0; color: #14532d; }
+    .score-par     { background: #e0f2fe; color: #0c4a6e; }
+    .score-bogey   { background: #fed7aa; color: #7c2d12; }
+    .score-double  { background: #fecaca; color: #7f1d1d; }
+    .score-worse   { background: #f3e8ff; color: #581c87; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-green-700 text-white shadow">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="{{ url_for('index') }}" class="flex items-center gap-2 font-bold text-lg tracking-tight">
+        <span>⛳</span> Golf Shot Tracker
+      </a>
+      {% if session.get('garmin_email') %}
+      <div class="flex items-center gap-4 text-sm">
+        <span class="opacity-75">{{ session['garmin_email'] }}</span>
+        <form method="POST" action="{{ url_for('sync') }}">
+          <button type="submit"
+                  class="bg-white text-green-700 px-3 py-1 rounded font-medium hover:bg-green-50 transition">
+            Sync Rounds
+          </button>
+        </form>
+        <a href="{{ url_for('logout') }}" class="opacity-75 hover:opacity-100">Logout</a>
+      </div>
+      {% endif %}
+    </div>
+  </nav>
+
+  <!-- Flash messages -->
+  <div class="max-w-6xl mx-auto px-4 pt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="mb-3 px-4 py-3 rounded text-sm font-medium
+          {% if category == 'error' %}bg-red-100 text-red-800
+          {% else %}bg-green-100 text-green-800{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>
